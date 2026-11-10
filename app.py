@@ -481,6 +481,16 @@ if ss.lga_choice not in ("All LGAs", *available_lgas):
 
 selected_state = ss.state if ss.state in all_states else "All states"
 question, metric_column = INDICATORS[ss.indicator]
+zone_states = all_states if ss.zone == "All zones" else tuple(
+    state for state in all_states if STATE_ZONE.get(state) == ss.zone
+)
+state_options = ["All states", *zone_states]
+if ss.state not in state_options:
+    ss.state = "All states"
+    ss.state_select = "All states"
+    selected_state = "All states"
+ss.zone_select = ss.zone
+ss.state_select = ss.state
 
 if selected_state != "All states":
     state_data = df[df.state == selected_state]
@@ -519,8 +529,8 @@ left, mid, right = st.columns([1.15, 2.7, 1.35], gap="medium")
 
 with left:
     st.markdown(
-        '<div class="big-title"><div class="q">PU</div>'
-        '<div class="t">Know 9ja<br>Dashboard</div></div>',
+        '<div class="big-title"><div class="q">#KYP</div>'
+        '<div class="t">Know Your<br>Polling Units<br>Dashboard</div></div>',
         unsafe_allow_html=True,
     )
     if selected_state != "All states":
@@ -561,35 +571,6 @@ with left:
             key="indicator_mobile",
             on_change=on_mobile_indicator_change,
         )
-
-    st.markdown("#### Filters")
-    ss.zone_select = ss.zone
-    st.selectbox(
-        "Zone",
-        ["All zones", *ZONES],
-        key="zone_select",
-        on_change=on_zone_change,
-    )
-    zone_states = all_states if ss.zone == "All zones" else tuple(
-        state for state in all_states if STATE_ZONE.get(state) == ss.zone
-    )
-    state_options = ["All states", *zone_states]
-    if ss.state not in state_options:
-        ss.state = "All states"
-        ss.state_select = "All states"
-        selected_state = "All states"
-        state_data = df.iloc[0:0]
-        available_lgas = ()
-    ss.state_select = ss.state
-    st.selectbox(
-        "State (or tap the map)",
-        state_options,
-        key="state_select",
-        format_func=format_name,
-        on_change=on_state_change,
-    )
-    if selected_state != "All states":
-        st.button("Back to Nigeria map", on_click=back_to_nigeria, width="stretch")
 
 if selected_state == "All states":
     view = metrics if ss.zone == "All zones" else metrics[metrics.zone == ss.zone]
@@ -810,6 +791,23 @@ with mid:
             st.warning("Local government boundaries could not be loaded. The local government list is still available.")
 
 with right:
+    st.markdown("#### Filters")
+    st.selectbox(
+        "Zone",
+        ["All zones", *ZONES],
+        key="zone_select",
+        on_change=on_zone_change,
+    )
+    st.selectbox(
+        "State (or tap the map)",
+        state_options,
+        key="state_select",
+        format_func=format_name,
+        on_change=on_state_change,
+    )
+    if selected_state != "All states":
+        st.button("Back to Nigeria map", on_click=back_to_nigeria, width="stretch")
+
     scope = "Nigeria" if selected_state == "All states" else format_name(selected_state)
     st.markdown(
         f'<div class="rhead">Drill-down: <b>{scope}</b>'
