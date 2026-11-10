@@ -520,7 +520,7 @@ left, mid, right = st.columns([1.15, 2.7, 1.35], gap="medium")
 with left:
     st.markdown(
         '<div class="big-title"><div class="q">PU</div>'
-        '<div class="t">Performance<br>Dashboard</div></div>',
+        '<div class="t">Know 9ja<br>Dashboard</div></div>',
         unsafe_allow_html=True,
     )
     if selected_state != "All states":
