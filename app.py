@@ -57,10 +57,10 @@ st.set_page_config(page_title="Polling Units Dashboard", layout="wide", initial_
 
 st.markdown("""
 <style>
-.block-container{padding-top:1rem;padding-bottom:0;max-width:100%}
+.block-container{padding-top:2rem;padding-bottom:1rem;max-width:100%}
 [data-testid="stSidebar"]{display:none}
-.big-title{display:flex;align-items:center;gap:14px}
-.big-title .q{font-size:64px;font-weight:800;color:#2F3A4A;line-height:1}
+.big-title{display:flex;align-items:center;gap:14px;min-height:76px}
+.big-title .q{font-size:64px;font-weight:800;color:#2F3A4A;line-height:1.15}
 .big-title .t{border-left:2px solid #ccc;padding-left:12px;font-size:22px;font-weight:700;color:#2F3A4A;line-height:1.2}
 .grp{font-size:12px;font-weight:700;color:#8A94A6;letter-spacing:1px;margin:14px 0 6px}
 div[data-testid="stButton"] button{border-radius:20px;border:1px solid #DDE1E7;background:#fff;color:#2F3A4A;
@@ -76,6 +76,13 @@ div[data-testid="stButton"] button[kind="primary"]{background:#F5EEF8;border-col
 .note{font-size:12px;color:#8A94A6}
 .rhead{color:#8A94A6;font-size:15px}
 .beta{background:#EFE3FA;color:#7B3F8C;font-size:11px;border-radius:10px;padding:2px 8px;margin-left:6px}
+@media (max-width: 1100px){
+  .big-title{gap:8px;min-height:60px}
+  .big-title .q{font-size:48px}
+  .big-title .t{font-size:17px}
+  .legend{gap:6px;font-size:12px}
+  .legend span{width:24px;margin-right:6px}
+}
 </style>""", unsafe_allow_html=True)
 
 
@@ -147,6 +154,7 @@ def load_geojson(states):
             close = difflib.get_close_matches(n, states, n=1, cutoff=0.6)
             n = close[0] if close else n
         f["id"] = n
+        f["properties"]["dashboard_state"] = n
     return gj
 
 
@@ -173,10 +181,20 @@ ss.setdefault("indicator", DEFAULT_IND)
 ss.setdefault("zone", "All zones")
 ss.setdefault("state", "All states")
 ss.setdefault("search", "")
+ss.setdefault("map_version", 0)
 
 
 def reset():
     ss.indicator, ss.zone, ss.state, ss.search = DEFAULT_IND, "All zones", "All states", ""
+    ss.map_version += 1
+
+
+def on_state_change():
+    ss.map_version += 1
+
+
+def on_zone_change():
+    ss.map_version += 1
 
 
 if not CSV_PATH.exists():
@@ -186,6 +204,10 @@ if not CSV_PATH.exists():
 df = load_data(str(CSV_PATH))
 metrics = state_metrics(df)
 all_states = sorted(metrics.state)
+pending_state = ss.pop("_pending_map_state", None)
+if pending_state in all_states:
+    ss.state = pending_state
+    ss.map_version += 1
 
 left, mid, right = st.columns([1.15, 2.7, 1.35], gap="medium")
 
@@ -220,12 +242,14 @@ with mid:
     k, f1, f2 = st.columns([1.3, 1, 1])
     k.markdown(f'<div class="kpi"><div class="dot"></div><div><div class="n">{len(fdf):,}</div>'
                f'<div class="s">Polling units tracked</div></div></div>', unsafe_allow_html=True)
-    f1.selectbox("Zone", ["All zones"] + list(ZONES), key="zone", label_visibility="collapsed")
+    f1.selectbox("Zone", ["All zones"] + list(ZONES), key="zone", label_visibility="collapsed",
+                 on_change=on_zone_change)
     opts = ["All states"] + (all_states if ss.zone == "All zones" else sorted(view.state))
     if ss.state not in opts:
         ss.state = "All states"
     f2.selectbox("State", opts, key="state", label_visibility="collapsed",
-                 format_func=lambda s: s.title() if s != "fct" else "FCT")
+                 format_func=lambda s: s.title() if s != "fct" else "FCT",
+                 on_change=on_state_change)
 
     st.markdown(f'<div class="question">{question}</div>', unsafe_allow_html=True)
 
@@ -234,46 +258,62 @@ with mid:
         f'<div><span style="background:{COLORS[b]}"></span>{b}</div>'
         for b in ["75 - 100%", "25 - 50%", "50 - 75%", "0 - 25%"]) + "</div>", unsafe_allow_html=True)
     lg2.markdown('<div class="note">Each score is the state value as a % of the highest state for the selected '
-                 'indicator and zone. Click a state on the map to view more information.</div>',
+                 'indicator and zone. Click a state label to view more information.</div>',
                  unsafe_allow_html=True)
 
     plot = view[["state", col, "zone"]].copy()
     mx = plot[col].max() or 1
     plot["score"] = (plot[col] / mx * 100).round(1)
     plot["band"] = plot["score"].apply(bucket)
-    band_num = {"0 - 25%": 0, "25 - 50%": 1, "50 - 75%": 2, "75 - 100%": 3}
-    plot["z"] = plot["band"].map(band_num)
-    cscale = [[0, COLORS["0 - 25%"]], [0.25, COLORS["0 - 25%"]], [0.25, COLORS["25 - 50%"]], [0.5, COLORS["25 - 50%"]],
-              [0.5, COLORS["50 - 75%"]], [0.75, COLORS["50 - 75%"]], [0.75, COLORS["75 - 100%"]], [1, COLORS["75 - 100%"]]]
 
     gj = load_geojson(tuple(all_states))
     if gj:
         cen = centroids(gj)
-        fig = go.Figure(go.Choropleth(
-            geojson=gj, featureidkey="id", locations=plot.state, z=plot.z, zmin=-0.5, zmax=3.5, colorscale=cscale,
-            showscale=False, marker_line_color="#2F3A4A", marker_line_width=0.6,
-            customdata=plot[["state", col, "score", "band"]],
-            hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
-                          ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>"))
-        if ss.state != "All states":
-            sel = plot[plot.state == ss.state]
-            fig.add_trace(go.Choropleth(geojson=gj, locations=sel.state, z=[1] * len(sel),
-                                        colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]], showscale=False,
-                                        marker_line_color="#E0531F", marker_line_width=3, hoverinfo="skip"))
-        lab = [s for s in plot.state if s in cen]
-        fig.add_trace(go.Scattergeo(lon=[cen[s][0] for s in lab], lat=[cen[s][1] for s in lab],
-                                    text=[("FCT" if s == "fct" else s.title()) for s in lab], mode="text",
-                                    textfont=dict(size=9, color="#2F3A4A"), hoverinfo="skip"))
-        fig.update_geos(fitbounds="locations", visible=False)
-        fig.update_layout(height=560, margin=dict(l=0, r=0, t=0, b=0), dragmode=False,
+        values = plot.set_index("state")
+        fig = go.Figure()
+        for feature in gj["features"]:
+            state = feature["properties"]["dashboard_state"]
+            if state not in values.index:
+                continue
+            geometry = feature["geometry"]
+            polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+            row = values.loc[state]
+            for polygon in polygons:
+                ring = polygon[0]
+                fig.add_trace(go.Scatter(
+                    x=[point[0] for point in ring], y=[point[1] for point in ring],
+                    mode="lines", fill="toself", fillcolor=COLORS[row["band"]],
+                    line=dict(color="#E0531F" if state == ss.state else "#2F3A4A",
+                              width=2.5 if state == ss.state else 0.8),
+                    hoverinfo="skip", showlegend=False))
+        labels = [state for state in plot.state if state in cen]
+        fig.add_trace(go.Scatter(
+            x=[cen[state][0] for state in labels], y=[cen[state][1] for state in labels],
+            text=["FCT" if state == "fct" else state.title() for state in labels],
+            customdata=[[state, values.loc[state, col], values.loc[state, "score"]] for state in labels],
+            mode="markers+text", textposition="middle center",
+            textfont=dict(size=9, color="#2F3A4A"),
+            marker=dict(size=12, color="rgba(0,0,0,0.01)", line=dict(width=0)),
+            hovertemplate="<b>%{text}</b><br>" + ss.indicator +
+                          ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+            showlegend=False))
+        fig.update_xaxes(range=[2, 15], visible=False, fixedrange=True, constrain="domain")
+        fig.update_yaxes(range=[3.5, 14.2], visible=False, fixedrange=True,
+                         scaleanchor="x", scaleratio=1, constrain="domain")
+        fig.update_layout(height=600, margin=dict(l=0, r=0, t=0, b=0), dragmode=False,
                           clickmode="event+select",
-                          paper_bgcolor="rgba(0,0,0,0)", geo_bgcolor="rgba(0,0,0,0)")
+                          showlegend=False, plot_bgcolor="rgba(0,0,0,0)",
+                          paper_bgcolor="rgba(0,0,0,0)")
         ev = st.plotly_chart(fig, width="stretch", on_select="rerun", selection_mode="points",
-                             key="map", config={"displayModeBar": False})
+                             key=f"map_{ss.map_version}", config={"displayModeBar": False})
         pts = (ev or {}).get("selection", {}).get("points", [])
-        if pts and pts[0].get("location") and pts[0]["location"] != ss.get("_last_click"):
-            ss._last_click = pts[0]["location"]
-            ss.state = pts[0]["location"]
+        clicked_state = None
+        if pts:
+            point = pts[0]
+            clicked_state = point.get("location") or (
+                point.get("customdata", [None])[0] if point.get("customdata") else None)
+        if clicked_state in all_states and clicked_state != ss.state:
+            ss["_pending_map_state"] = clicked_state
             st.rerun()
     else:
         st.warning("Map boundaries unavailable (no internet). Save nigeria_states.geojson beside app.py. "
