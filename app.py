@@ -106,6 +106,7 @@ st.markdown("""
   [data-testid="stHorizontalBlock"]{flex-wrap:wrap;gap:.65rem}
   [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]{flex:1 1 100%!important;min-width:100%!important}
   .st-key-indicator-menu{display:none}
+  [data-testid="stLayoutWrapper"]:has(> .stVerticalBlock.st-key-indicator-menu){display:none!important}
   .st-key-mobile-indicator-control{display:block}
   h1{font-size:1.55rem!important}
   h2{font-size:1.35rem!important}
@@ -659,11 +660,30 @@ with mid:
                               ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
                 showlegend=False,
             ))
-            figure.update_xaxes(range=[2, 15], visible=False, fixedrange=True, constrain="domain")
-            figure.update_yaxes(range=[3.5, 14.2], visible=False, fixedrange=True,
-                                scaleanchor="x", scaleratio=1, constrain="domain")
+            map_x = [point[0] for feature in map_geojson["features"]
+                     if feature["properties"]["dashboard_state"] in values.index
+                     for ring in _outer_rings(feature["geometry"]) for point in ring]
+            map_y = [point[1] for feature in map_geojson["features"]
+                     if feature["properties"]["dashboard_state"] in values.index
+                     for ring in _outer_rings(feature["geometry"]) for point in ring]
+            pad_x = (max(map_x) - min(map_x)) * 0.05
+            pad_y = (max(map_y) - min(map_y)) * 0.05
+            figure.update_xaxes(
+                range=[min(map_x) - pad_x, max(map_x) + pad_x],
+                visible=False,
+                fixedrange=True,
+                constrain="domain",
+            )
+            figure.update_yaxes(
+                range=[min(map_y) - pad_y, max(map_y) + pad_y],
+                visible=False,
+                fixedrange=True,
+                scaleanchor="x",
+                scaleratio=1,
+                constrain="domain",
+            )
             figure.update_layout(
-                height=620,
+                height=540,
                 margin=dict(l=0, r=0, t=4, b=4),
                 dragmode=False,
                 clickmode="event+select",
