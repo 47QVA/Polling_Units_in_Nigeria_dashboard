@@ -57,7 +57,9 @@ st.set_page_config(page_title="Polling Units Dashboard", layout="wide", initial_
 
 st.markdown("""
 <style>
-.block-container{padding-top:2rem;padding-bottom:1rem;max-width:100%}
+.block-container{padding-top:1.5rem;padding-bottom:1rem;max-width:100%}
+[data-testid="stHeader"],.stAppHeader{display:none}
+[data-testid="stToolbar"]{display:none}
 [data-testid="stSidebar"]{display:none}
 .big-title{display:flex;align-items:center;gap:14px;min-height:76px}
 .big-title .q{font-size:64px;font-weight:800;color:#2F3A4A;line-height:1.15}
