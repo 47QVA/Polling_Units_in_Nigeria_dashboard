@@ -168,6 +168,42 @@ def centroids(gj):
     return out
 
 
+def _inside_ring(lon, lat, ring):
+    inside = False
+    x1, y1 = ring[-1]
+    for x2, y2 in ring:
+        if (y2 > lat) != (y1 > lat) and lon < (x1 - x2) * (lat - y2) / (y1 - y2) + x2:
+            inside = not inside
+        x1, y1 = x2, y2
+    return inside
+
+
+@st.cache_data(show_spinner=False)
+def map_click_targets(gj, states, spacing=0.15):
+    targets = []
+    for feature in gj["features"]:
+        state = feature["properties"]["dashboard_state"]
+        if state not in states:
+            continue
+        geometry = feature["geometry"]
+        polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+        for polygon in polygons:
+            outer = polygon[0]
+            min_lon, max_lon = min(p[0] for p in outer), max(p[0] for p in outer)
+            min_lat, max_lat = min(p[1] for p in outer), max(p[1] for p in outer)
+            lon = (int(min_lon / spacing) + 0.5) * spacing
+            while lon < max_lon:
+                lat = (int(min_lat / spacing) + 0.5) * spacing
+                while lat < max_lat:
+                    if _inside_ring(lon, lat, outer) and not any(
+                        _inside_ring(lon, lat, hole) for hole in polygon[1:]
+                    ):
+                        targets.append((state, lon, lat))
+                    lat += spacing
+                lon += spacing
+    return targets
+
+
 def bucket(pct):
     if pct >= 75: return "75 - 100%"
     if pct >= 50: return "50 - 75%"
@@ -258,7 +294,7 @@ with mid:
         f'<div><span style="background:{COLORS[b]}"></span>{b}</div>'
         for b in ["75 - 100%", "25 - 50%", "50 - 75%", "0 - 25%"]) + "</div>", unsafe_allow_html=True)
     lg2.markdown('<div class="note">Each score is the state value as a % of the highest state for the selected '
-                 'indicator and zone. Click a state label to view more information.</div>',
+                 'indicator and zone. Click a state to view more information.</div>',
                  unsafe_allow_html=True)
 
     plot = view[["state", col, "zone"]].copy()
@@ -283,10 +319,23 @@ with mid:
                 fig.add_trace(go.Scatter(
                     x=[point[0] for point in ring], y=[point[1] for point in ring],
                     mode="lines", fill="toself", fillcolor=COLORS[row["band"]],
+                    customdata=[[state, row[col], row["score"]] for _ in ring],
                     line=dict(color="#E0531F" if state == ss.state else "#2F3A4A",
                               width=2.5 if state == ss.state else 0.8),
-                    hoverinfo="skip", showlegend=False))
+                    hoveron="fills", hovertemplate="<b>" +
+                    ("FCT" if state == "fct" else state.title()) + "</b><br>" + ss.indicator +
+                    ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+                    showlegend=False))
         labels = [state for state in plot.state if state in cen]
+        targets = map_click_targets(gj, tuple(labels))
+        target_values = [values.loc[state] for state, _, _ in targets]
+        fig.add_trace(go.Scatter(
+            x=[lon for _, lon, _ in targets], y=[lat for _, _, lat in targets],
+            customdata=[[state, row[col], row["score"]] for (state, _, _), row in zip(targets, target_values)],
+            mode="markers", marker=dict(size=18, color="rgba(0,0,0,0.01)", line=dict(width=0)),
+            hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
+                          ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+            showlegend=False))
         fig.add_trace(go.Scatter(
             x=[cen[state][0] for state in labels], y=[cen[state][1] for state in labels],
             text=["FCT" if state == "fct" else state.title() for state in labels],
