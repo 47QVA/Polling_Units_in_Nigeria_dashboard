@@ -2,7 +2,7 @@
 A .csv dataset scrapped from IREV that contains the names and codes for 176,846 polling units in Nigeria with their respective wards, local governments, house of reps, senatorial districts, and states.
 
 ## Dashboard
-Run the mobile-first interactive dashboard with `streamlit run app.py`. Select an indicator, then tap a state to open its local-government map and polling-unit details. The dashboard uses a dark theme by default and supports polling-unit search and CSV downloads. State and LGA map boundaries are loaded on demand from geoBoundaries when no local boundary files are present.
+Run the responsive interactive dashboard with `streamlit run app.py`. On desktop, indicators, the map, and drill-down details use a three-panel layout; on mobile, the panels stack and indicators use a compact selector. Select an indicator, then tap a state to open its local-government map and polling-unit details. The dashboard uses a light theme by default and supports polling-unit search and CSV downloads. State and LGA map boundaries are loaded on demand from geoBoundaries when no local boundary files are present.
 
 * 176,846 polling units
 * 8,787 wards

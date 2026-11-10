@@ -31,10 +31,10 @@ COLORS = {
     "25 - 50%": "#FBBF24",
     "0 - 25%": "#FB7185",
 }
-MAP_BG = "#0E1117"
-MAP_TEXT = "#E2E8F0"
-MAP_BORDER = "#475569"
-MAP_HIGHLIGHT = "#F8FAFC"
+MAP_BG = "#FFFFFF"
+MAP_TEXT = "#334155"
+MAP_BORDER = "#64748B"
+MAP_HIGHLIGHT = "#0F172A"
 
 ZONES = {
     "North Central": ["benue", "kogi", "kwara", "nasarawa", "niger", "plateau", "fct"],
@@ -76,21 +76,43 @@ LGA_ALIASES = {
 st.set_page_config(page_title="Nigeria Polling Units", layout="wide", initial_sidebar_state="collapsed")
 st.markdown("""
 <style>
-.block-container{padding:.9rem 1rem 2rem;max-width:900px}
+.block-container{padding:1rem 1.25rem 2rem;max-width:1600px}
 [data-testid="stHeader"],.stAppHeader,[data-testid="stToolbar"],[data-testid="stSidebar"]{display:none}
 [data-testid="stBaseButton-secondary"],[data-testid="stBaseButton-primary"]{min-height:44px}
 [data-testid="stSelectbox"] [role="combobox"]{min-height:44px}
 [data-testid="stPlotlyChart"]{width:100%;margin:0 auto}
-.map-legend{display:flex;flex-wrap:wrap;gap:8px 16px;font-size:.85rem}
+.big-title{display:flex;align-items:center;gap:12px;min-height:70px;margin-bottom:.5rem}
+.big-title .q{font-size:52px;font-weight:800;color:#7C3AED;line-height:1}
+.big-title .t{border-left:2px solid #D1D5DB;padding-left:12px;font-size:19px;font-weight:700;line-height:1.2}
+.grp{font-size:11px;font-weight:700;color:#6B7280;letter-spacing:1px;margin:12px 0 5px}
+.indicator-button [data-testid="stBaseButton-secondary"],
+.indicator-button [data-testid="stBaseButton-primary"]{justify-content:flex-start;border-radius:8px}
+.kpi{padding:.55rem .7rem;border-radius:10px;background:#F3F4F6;margin:.25rem 0 .75rem}
+.question{text-align:center;font-size:20px;font-weight:700;color:#475569;margin:.5rem 0}
+.map-legend{display:flex;flex-wrap:wrap;gap:8px 14px;font-size:.82rem;margin:.5rem 0}
 .map-legend span{display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
 .map-legend i{width:18px;height:12px;border-radius:3px;display:inline-block}
-.subtle{color:var(--text-color);opacity:.72}
+.rhead{font-size:14px;color:#6B7280}
+.beta{background:#F3E8FF;color:#6B21A8;font-size:11px;border-radius:10px;padding:2px 8px;margin-left:6px}
+.st-key-indicator-menu{max-height:560px;overflow-y:auto}
+.st-key-mobile-indicator-control{display:none}
+@media (max-width:1100px){
+  .big-title{gap:8px;min-height:56px}
+  .big-title .q{font-size:42px}
+  .big-title .t{font-size:16px}
+}
 @media (max-width:700px){
-  .block-container{padding:.7rem .75rem 1.5rem}
-  h1{font-size:1.65rem!important}
+  .block-container{padding:.65rem .75rem 1.5rem}
+  [data-testid="stHorizontalBlock"]{flex-wrap:wrap;gap:.65rem}
+  [data-testid="stHorizontalBlock"]>[data-testid="stColumn"]{flex:1 1 100%!important;min-width:100%!important}
+  .st-key-indicator-menu{display:none}
+  .st-key-mobile-indicator-control{display:block}
+  h1{font-size:1.55rem!important}
   h2{font-size:1.35rem!important}
-  [data-testid="stMetricValue"]{font-size:1.35rem}
-  [data-testid="stPlotlyChart"]{margin-left:-.25rem;width:calc(100% + .5rem)}
+  [data-testid="stMetricValue"]{font-size:1.3rem}
+  [data-testid="stPlotlyChart"]{margin-left:-.2rem;width:calc(100% + .4rem)}
+  .big-title{min-height:48px}
+  .big-title .q{font-size:38px}
 }
 </style>
 """, unsafe_allow_html=True)
@@ -373,6 +395,8 @@ def legend():
 
 def reset():
     ss.indicator = DEFAULT_IND
+    ss.indicator_mobile = DEFAULT_IND
+    ss.indicator_search = ""
     ss.zone = "All zones"
     ss.zone_select = "All zones"
     ss.state = "All states"
@@ -400,6 +424,11 @@ def on_indicator_change():
     ss.map_version += 1
 
 
+def on_mobile_indicator_change():
+    ss.indicator = ss.indicator_mobile
+    ss.map_version += 1
+
+
 def back_to_nigeria():
     ss.state = "All states"
     ss.state_select = "All states"
@@ -416,6 +445,8 @@ ss.setdefault("zone_select", ss.zone)
 ss.setdefault("state_select", ss.state)
 ss.setdefault("lga_choice", "All LGAs")
 ss.setdefault("search", "")
+ss.setdefault("indicator_search", "")
+ss.setdefault("indicator_mobile", ss.indicator)
 ss.setdefault("map_version", 0)
 
 if not CSV_PATH.exists():
@@ -448,160 +479,13 @@ if ss.lga_choice not in ("All LGAs", *available_lgas):
     ss.lga_choice = "All LGAs"
 
 selected_state = ss.state if ss.state in all_states else "All states"
-st.title("Nigeria Polling Units")
-st.caption("Explore polling units, wards and local governments across Nigeria.")
-
-if selected_state != "All states":
-    back_col, reset_col = st.columns(2)
-    back_col.button("Back to Nigeria map", on_click=back_to_nigeria, width="stretch")
-    reset_col.button("Reset filters", on_click=reset, width="stretch")
-    st.subheader(format_name(selected_state))
-else:
-    st.button("Reset filters", on_click=reset, width="stretch")
-
-st.selectbox(
-    "Indicator",
-    list(INDICATORS),
-    key="indicator",
-    on_change=on_indicator_change,
-)
 question, metric_column = INDICATORS[ss.indicator]
 
-if selected_state == "All states":
-    ss.zone_select = ss.zone
-    ss.state_select = ss.state
-    st.selectbox(
-        "Zone",
-        ["All zones", *ZONES],
-        key="zone_select",
-        on_change=on_zone_change,
-    )
-    zone = ss.zone
-    zone_states = all_states if zone == "All zones" else tuple(
-        state for state in all_states if STATE_ZONE.get(state) == ss.zone
-    )
-    state_options = ["All states", *zone_states]
-    if ss.state not in state_options:
-        ss.state = "All states"
-        ss.state_select = "All states"
-    st.selectbox(
-        "State (or tap the map)",
-        state_options,
-        key="state_select",
-        format_func=format_name,
-        on_change=on_state_change,
-    )
-
-if selected_state == "All states":
-    view = metrics if ss.zone == "All zones" else metrics[metrics.zone == ss.zone]
-    chart_data = view[["state", metric_column]].copy()
-    maximum = chart_data[metric_column].max() or 1
-    chart_data["score"] = (chart_data[metric_column] / maximum * 100).round(1)
-    chart_data["band"] = chart_data["score"].apply(bucket)
-
-    st.metric("Polling units tracked", f"{int(view.polling_units.sum()):,}")
-    st.markdown(question)
-    legend()
-    geojson = load_geojson(all_states)
-    if geojson:
-        values = chart_data.set_index("state")
-        centers = centroids(geojson)
-        visible_states = tuple(chart_data.state)
-        figure = go.Figure()
-        for feature in geojson["features"]:
-            state = feature["properties"]["dashboard_state"]
-            if state not in values.index:
-                continue
-            row = values.loc[state]
-            geometry = feature["geometry"]
-            polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
-            for polygon in polygons:
-                ring = polygon[0]
-                figure.add_trace(go.Scatter(
-                    x=[point[0] for point in ring],
-                    y=[point[1] for point in ring],
-                    mode="lines",
-                    fill="toself",
-                    fillcolor=COLORS[row["band"]],
-                    line=dict(color=MAP_BORDER, width=0.8),
-                    hoveron="fills",
-                    hovertemplate=f"<b>{format_name(state)}</b><br>{ss.indicator}: "
-                                  f"{format_value(row[metric_column], metric_column)}<extra></extra>",
-                    showlegend=False,
-                ))
-        targets = map_click_targets(geojson, visible_states)
-        figure.add_trace(go.Scatter(
-            x=[lon for _, lon, _ in targets],
-            y=[lat for _, _, lat in targets],
-            customdata=[[state, values.loc[state, metric_column], values.loc[state, "score"]]
-                        for state, _, _ in targets],
-            mode="markers",
-            marker=dict(size=18, color="rgba(0,0,0,0.01)"),
-            hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
-                          ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
-            showlegend=False,
-        ))
-        labels = [state for state in visible_states if state in centers]
-        figure.add_trace(go.Scatter(
-            x=[centers[state][0] for state in labels],
-            y=[centers[state][1] for state in labels],
-            text=[format_name(state) for state in labels],
-            customdata=[[state, values.loc[state, metric_column], values.loc[state, "score"]]
-                        for state in labels],
-            mode="markers+text",
-            textposition="middle center",
-            textfont=dict(size=9, color=MAP_TEXT),
-            marker=dict(size=12, color="rgba(0,0,0,0.01)"),
-            hovertemplate="<b>%{text}</b><br>" + ss.indicator +
-                          ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
-            showlegend=False,
-        ))
-        figure.update_xaxes(range=[2, 15], visible=False, fixedrange=True, constrain="domain")
-        figure.update_yaxes(range=[3.5, 14.2], visible=False, fixedrange=True,
-                            scaleanchor="x", scaleratio=1, constrain="domain")
-        figure.update_layout(
-            height=440,
-            margin=dict(l=0, r=0, t=4, b=4),
-            dragmode=False,
-            clickmode="event+select",
-            showlegend=False,
-            plot_bgcolor=MAP_BG,
-            paper_bgcolor=MAP_BG,
-            hoverlabel=dict(bgcolor="#1E293B", font_color=MAP_TEXT),
-        )
-        event = st.plotly_chart(
-            figure,
-            width="stretch",
-            on_select="rerun",
-            selection_mode="points",
-            key=f"state_map_{ss.map_version}",
-            config={"displayModeBar": False},
-        )
-        points = (event or {}).get("selection", {}).get("points", [])
-        if points:
-            custom = points[0].get("customdata")
-            clicked_state = custom[0] if custom else None
-            if clicked_state in all_states and clicked_state != ss.state:
-                ss["_pending_map_state"] = clicked_state
-                st.rerun()
-    else:
-        st.warning("State boundaries could not be loaded. Check the app's internet connection.")
-
-    st.caption("Tap a state on the map or choose one above to see its local governments.")
-    with st.expander("State ranking"):
-        ranking = view[["state", metric_column]].sort_values(metric_column, ascending=False).copy()
-        ranking["state"] = ranking.state.map(format_name)
-        ranking = ranking.rename(columns={"state": "State", metric_column: ss.indicator})
-        st.dataframe(ranking, hide_index=True, width="stretch", height=360)
-else:
-    state_metrics_row = metrics.loc[metrics.state == selected_state].iloc[0]
-    pu_col, ward_col = st.columns(2)
-    pu_col.metric("Polling units", f"{int(state_metrics_row.polling_units):,}")
-    ward_col.metric("Wards", f"{int(state_metrics_row.wards):,}")
-    lga_col, zone_col = st.columns(2)
-    lga_col.metric("Local governments", f"{int(state_metrics_row.lgas):,}")
-    zone_col.metric("Zone", STATE_ZONE.get(selected_state, "Unknown"))
-
+if selected_state != "All states":
+    state_data = df[df.state == selected_state]
+    available_lgas = tuple(sorted(state_data.lg.unique()))
+    if ss.lga_choice not in ("All LGAs", *available_lgas):
+        ss.lga_choice = "All LGAs"
     groups = state_data.groupby("lg", sort=False)
     lga_summary = pd.DataFrame({
         "polling_units": groups.size(),
@@ -624,172 +508,372 @@ else:
     ).round(1)
     lga_summary["band"] = lga_summary.score.apply(bucket)
     lga_lookup = lga_summary.set_index("map_key")
+else:
+    state_data = df.iloc[0:0]
+    available_lgas = ()
+    lga_summary = pd.DataFrame()
+    lga_lookup = pd.DataFrame()
 
-    st.markdown(f"#### {ss.indicator} by local government")
-    legend()
-    lga_geojson, unmatched = load_lga_geojson(all_states, lga_pairs)
-    if lga_geojson:
-        available_features = [
-            feature for feature in lga_geojson["features"]
-            if feature["properties"]["dashboard_state"] == selected_state
-        ]
-        figure = go.Figure()
-        map_features = []
-        min_lon, min_lat, max_lon, max_lat = 180, 90, -180, -90
-        for feature in available_features:
-            properties = feature["properties"]
-            map_key = feature["id"]
-            if map_key not in lga_lookup.index:
+left, mid, right = st.columns([1.15, 2.7, 1.35], gap="medium")
+
+with left:
+    st.markdown(
+        '<div class="big-title"><div class="q">PU</div>'
+        '<div class="t">Performance<br>Dashboard</div></div>',
+        unsafe_allow_html=True,
+    )
+    if selected_state != "All states":
+        st.caption(f"Currently viewing {format_name(selected_state)}")
+
+    st.button("Reset filters", on_click=reset, width="stretch")
+    indicator_groups = {
+        "COUNTS": ["Polling units", "Wards", "LGAs", "Senatorial districts", "Federal constituencies"],
+        "AVERAGES": ["PUs per ward", "PUs per LGA", "Wards per LGA"],
+        "DISTRIBUTION": ["Largest ward (PUs)", "Share of national PUs"],
+    }
+    with st.container(key="indicator-menu", height=560, border=False):
+        st.markdown("#### Indicators")
+        indicator_query = st.text_input(
+            "Search indicators", key="indicator_search", placeholder="Search indicators"
+        ).strip().lower()
+        for group_name, labels in indicator_groups.items():
+            shown = [label for label in labels if indicator_query in label.lower()]
+            if not shown:
                 continue
-            row = lga_lookup.loc[map_key]
-            geometry = feature["geometry"]
-            polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
-            for polygon in polygons:
-                outer = polygon[0]
-                min_lon = min(min_lon, min(point[0] for point in outer))
-                max_lon = max(max_lon, max(point[0] for point in outer))
-                min_lat = min(min_lat, min(point[1] for point in outer))
-                max_lat = max(max_lat, max(point[1] for point in outer))
-                figure.add_trace(go.Scatter(
-                    x=[point[0] for point in outer],
-                    y=[point[1] for point in outer],
-                    mode="lines",
-                    fill="toself",
-                    fillcolor=COLORS[row["band"]],
-                    line=dict(color=MAP_HIGHLIGHT if ss.lga_choice == properties["dashboard_lga"]
-                              else MAP_BORDER,
-                              width=2 if ss.lga_choice == properties["dashboard_lga"] else 0.8),
-                    customdata=[[properties["dashboard_lga"], row[metric_column], row["score"]]
-                                for _ in outer],
-                    hoveron="fills",
-                    hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
-                                  ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
-                    showlegend=False,
-                ))
-            map_features.append(feature)
-
-        targets = lga_click_targets(map_features, selected_state)
-        figure.add_trace(go.Scatter(
-            x=[lon for _, lon, _ in targets],
-            y=[lat for _, _, lat in targets],
-            customdata=[[map_key, lga_lookup.loc[map_key, metric_column],
-                         map_key.split("|", 1)[1].title()]
-                        for map_key, _, _ in targets],
-            mode="markers",
-            marker=dict(size=16, color=MAP_TEXT, line=dict(color=MAP_BG, width=1)),
-            hovertemplate="<b>%{customdata[2]}</b><br>" + ss.indicator +
-                          ": %{customdata[1]:,}<extra></extra>",
-            showlegend=False,
-        ))
-        if min_lon < max_lon and min_lat < max_lat:
-            pad = max(max_lon - min_lon, max_lat - min_lat) * 0.04
-            figure.update_xaxes(
-                range=[min_lon - pad, max_lon + pad], visible=False, fixedrange=True, constrain="domain"
-            )
-            figure.update_yaxes(
-                range=[min_lat - pad, max_lat + pad], visible=False, fixedrange=True,
-                scaleanchor="x", scaleratio=1, constrain="domain"
-            )
-        figure.update_layout(
-            height=420,
-            margin=dict(l=0, r=0, t=4, b=4),
-            dragmode=False,
-            clickmode="event+select",
-            showlegend=False,
-            plot_bgcolor=MAP_BG,
-            paper_bgcolor=MAP_BG,
-            hoverlabel=dict(bgcolor="#1E293B", font_color=MAP_TEXT),
-        )
-        event = st.plotly_chart(
-            figure,
-            width="stretch",
-            on_select="rerun",
-            selection_mode="points",
-            key=f"lga_map_{selected_state}_{ss.map_version}",
-            config={"displayModeBar": False},
-        )
-        points = (event or {}).get("selection", {}).get("points", [])
-        if points:
-            custom = points[0].get("customdata")
-            map_key = custom[0] if custom else None
-            if map_key and "|" in map_key:
-                clicked_lga = map_key.split("|", 1)[1]
-                if clicked_lga in available_lgas and clicked_lga != ss.lga_choice:
-                    ss["_pending_lga"] = clicked_lga
+            st.markdown(f'<div class="grp">{group_name}</div>', unsafe_allow_html=True)
+            for label in shown:
+                if st.button(
+                    label,
+                    key=f"indicator_{label}",
+                    type="primary" if ss.indicator == label else "secondary",
+                    width="stretch",
+                ):
+                    ss.indicator = label
+                    ss.map_version += 1
                     st.rerun()
-        if unmatched:
-            st.warning(f"{len(unmatched)} local government boundary could not be matched to the dataset.")
-        st.caption("Tap a local-government marker or choose one below.")
-    else:
-        st.warning("Local government boundaries could not be loaded. The local government list is still available.")
 
-    st.selectbox(
-        "Choose a local government (or tap the map)",
-        ["All LGAs", *available_lgas],
-        key="lga_choice",
-        format_func=lambda name: (
-            "All local governments" if name == "All LGAs"
-            else f"{name.title()} · {int(lga_summary.loc[name, 'polling_units']):,} PUs"
-        ),
-    )
-    if ss.lga_choice != "All LGAs":
-        selected_lga = lga_summary.loc[ss.lga_choice]
-        st.markdown(f"### {ss.lga_choice.title()}")
-        pu_col, ward_col = st.columns(2)
-        pu_col.metric("Polling units", f"{int(selected_lga.polling_units):,}")
-        ward_col.metric("Wards", f"{int(selected_lga.wards):,}")
-        st.metric(ss.indicator, format_value(selected_lga[metric_column], metric_column))
-        ward_table = (
-            state_data[state_data.lg == ss.lga_choice]
-            .groupby("ward").size().reset_index(name="Polling units")
-            .sort_values("Polling units", ascending=False)
-            .rename(columns={"ward": "Ward"})
+    ss.indicator_mobile = ss.indicator
+    with st.container(key="mobile-indicator-control"):
+        st.selectbox(
+            "Indicator",
+            list(INDICATORS),
+            key="indicator_mobile",
+            on_change=on_mobile_indicator_change,
         )
-        with st.expander("Wards in this local government"):
-            st.dataframe(ward_table, hide_index=True, width="stretch", height=360)
 
-    table_columns = ["polling_units", "wards"]
-    table_labels = ["Polling units", "Wards"]
-    if metric_column not in table_columns:
-        table_columns.append(metric_column)
-        table_labels.append(ss.indicator)
-    lga_table = lga_summary.reset_index().rename(columns={"lg": "Local government"})
-    lga_table["Local government"] = lga_table["Local government"].str.title()
-    lga_table = lga_table[["Local government", *table_columns]].sort_values(
-        "polling_units", ascending=False
+    st.markdown("#### Filters")
+    ss.zone_select = ss.zone
+    st.selectbox(
+        "Zone",
+        ["All zones", *ZONES],
+        key="zone_select",
+        on_change=on_zone_change,
     )
-    lga_table.columns = ["Local government", *table_labels]
-    with st.expander("All local government details"):
-        st.dataframe(lga_table, hide_index=True, width="stretch", height=420)
+    zone_states = all_states if ss.zone == "All zones" else tuple(
+        state for state in all_states if STATE_ZONE.get(state) == ss.zone
+    )
+    state_options = ["All states", *zone_states]
+    if ss.state not in state_options:
+        ss.state = "All states"
+        ss.state_select = "All states"
+        selected_state = "All states"
+        state_data = df.iloc[0:0]
+        available_lgas = ()
+    ss.state_select = ss.state
+    st.selectbox(
+        "State (or tap the map)",
+        state_options,
+        key="state_select",
+        format_func=format_name,
+        on_change=on_state_change,
+    )
+    if selected_state != "All states":
+        st.button("Back to Nigeria map", on_click=back_to_nigeria, width="stretch")
 
 if selected_state == "All states":
-    search_data = df if ss.zone == "All zones" else df[df.zone == ss.zone]
+    view = metrics if ss.zone == "All zones" else metrics[metrics.zone == ss.zone]
+    chart_data = view[["state", metric_column]].copy()
+    maximum = chart_data[metric_column].max() or 1
+    chart_data["score"] = (chart_data[metric_column] / maximum * 100).round(1)
+    chart_data["band"] = chart_data["score"].apply(bucket)
+    map_geojson = load_geojson(all_states)
 else:
-    search_data = state_data
-if ss.lga_choice != "All LGAs" and selected_state != "All states":
-    search_data = search_data[search_data.lg == ss.lga_choice]
+    state_metric_row = metrics.loc[metrics.state == selected_state].iloc[0]
+    map_geojson, unmatched = load_lga_geojson(all_states, lga_pairs)
 
-with st.expander("Find a polling unit or download data"):
-    term = st.text_input("Search by polling-unit location or code", key="search")
-    if term:
-        matches = search_data[
-            search_data.location.str.contains(term.lower(), regex=False)
-            | search_data.code.str.contains(term.lower(), regex=False)
-        ]
-        st.caption(f"{len(matches):,} match(es); showing up to 100.")
-        st.dataframe(
-            matches[["code", "state", "lg", "ward", "location"]].head(100),
-            hide_index=True,
-            width="stretch",
-            height=320,
+with mid:
+    if selected_state == "All states":
+        st.subheader(question)
+        st.metric("Polling units tracked", f"{int(view.polling_units.sum()):,}")
+        legend()
+        if map_geojson:
+            values = chart_data.set_index("state")
+            centers = centroids(map_geojson)
+            visible_states = tuple(chart_data.state)
+            figure = go.Figure()
+            for feature in map_geojson["features"]:
+                state = feature["properties"]["dashboard_state"]
+                if state not in values.index:
+                    continue
+                row = values.loc[state]
+                geometry = feature["geometry"]
+                polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+                for polygon in polygons:
+                    ring = polygon[0]
+                    figure.add_trace(go.Scatter(
+                        x=[point[0] for point in ring],
+                        y=[point[1] for point in ring],
+                        mode="lines",
+                        fill="toself",
+                        fillcolor=COLORS[row["band"]],
+                        line=dict(color=MAP_BORDER, width=0.8),
+                        hoveron="fills",
+                        hovertemplate=f"<b>{format_name(state)}</b><br>{ss.indicator}: "
+                                      f"{format_value(row[metric_column], metric_column)}<extra></extra>",
+                        showlegend=False,
+                    ))
+            targets = map_click_targets(map_geojson, visible_states)
+            figure.add_trace(go.Scatter(
+                x=[lon for _, lon, _ in targets],
+                y=[lat for _, _, lat in targets],
+                customdata=[[state, values.loc[state, metric_column], values.loc[state, "score"]]
+                            for state, _, _ in targets],
+                mode="markers",
+                marker=dict(size=18, color="rgba(0,0,0,0.01)"),
+                hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
+                              ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+                showlegend=False,
+            ))
+            labels = [state for state in visible_states if state in centers]
+            figure.add_trace(go.Scatter(
+                x=[centers[state][0] for state in labels],
+                y=[centers[state][1] for state in labels],
+                text=[format_name(state) for state in labels],
+                customdata=[[state, values.loc[state, metric_column], values.loc[state, "score"]]
+                            for state in labels],
+                mode="markers+text",
+                textposition="middle center",
+                textfont=dict(size=9, color=MAP_TEXT),
+                marker=dict(size=12, color="rgba(0,0,0,0.01)"),
+                hovertemplate="<b>%{text}</b><br>" + ss.indicator +
+                              ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+                showlegend=False,
+            ))
+            figure.update_xaxes(range=[2, 15], visible=False, fixedrange=True, constrain="domain")
+            figure.update_yaxes(range=[3.5, 14.2], visible=False, fixedrange=True,
+                                scaleanchor="x", scaleratio=1, constrain="domain")
+            figure.update_layout(
+                height=620,
+                margin=dict(l=0, r=0, t=4, b=4),
+                dragmode=False,
+                clickmode="event+select",
+                showlegend=False,
+                plot_bgcolor=MAP_BG,
+                paper_bgcolor=MAP_BG,
+                hoverlabel=dict(bgcolor="#FFFFFF", font_color=MAP_TEXT),
+            )
+            event = st.plotly_chart(
+                figure,
+                width="stretch",
+                on_select="rerun",
+                selection_mode="points",
+                key=f"state_map_{ss.map_version}",
+                config={"displayModeBar": False},
+            )
+            points = (event or {}).get("selection", {}).get("points", [])
+            if points:
+                custom = points[0].get("customdata")
+                clicked_state = custom[0] if custom else None
+                if clicked_state in all_states and clicked_state != ss.state:
+                    ss["_pending_map_state"] = clicked_state
+                    st.rerun()
+        else:
+            st.warning("State boundaries could not be loaded. Check the app's internet connection.")
+
+        st.caption("Tap a state on the map or choose one in the filters.")
+    else:
+        st.subheader(f"{format_name(selected_state)} — {ss.indicator} by local government")
+        legend()
+        if map_geojson:
+            available_features = [
+                feature for feature in map_geojson["features"]
+                if feature["properties"]["dashboard_state"] == selected_state
+            ]
+            figure = go.Figure()
+            map_features = []
+            min_lon, min_lat, max_lon, max_lat = 180, 90, -180, -90
+            for feature in available_features:
+                properties = feature["properties"]
+                map_key = feature["id"]
+                if map_key not in lga_lookup.index:
+                    continue
+                row = lga_lookup.loc[map_key]
+                geometry = feature["geometry"]
+                polygons = geometry["coordinates"] if geometry["type"] == "MultiPolygon" else [geometry["coordinates"]]
+                for polygon in polygons:
+                    outer = polygon[0]
+                    min_lon = min(min_lon, min(point[0] for point in outer))
+                    max_lon = max(max_lon, max(point[0] for point in outer))
+                    min_lat = min(min_lat, min(point[1] for point in outer))
+                    max_lat = max(max_lat, max(point[1] for point in outer))
+                    figure.add_trace(go.Scatter(
+                        x=[point[0] for point in outer],
+                        y=[point[1] for point in outer],
+                        mode="lines",
+                        fill="toself",
+                        fillcolor=COLORS[row["band"]],
+                        line=dict(color=MAP_HIGHLIGHT if ss.lga_choice == properties["dashboard_lga"]
+                                  else MAP_BORDER,
+                                  width=2 if ss.lga_choice == properties["dashboard_lga"] else 0.8),
+                        customdata=[[properties["dashboard_lga"], row[metric_column], row["score"]]
+                                    for _ in outer],
+                        hoveron="fills",
+                        hovertemplate="<b>%{customdata[0]}</b><br>" + ss.indicator +
+                                      ": %{customdata[1]:,}<br>Score: %{customdata[2]}%<extra></extra>",
+                        showlegend=False,
+                    ))
+                map_features.append(feature)
+
+            targets = lga_click_targets(map_features, selected_state)
+            figure.add_trace(go.Scatter(
+                x=[lon for _, lon, _ in targets],
+                y=[lat for _, _, lat in targets],
+                customdata=[[map_key, lga_lookup.loc[map_key, metric_column],
+                             map_key.split("|", 1)[1].title()]
+                            for map_key, _, _ in targets],
+                mode="markers",
+                marker=dict(size=16, color=MAP_TEXT, line=dict(color=MAP_BG, width=1)),
+                hovertemplate="<b>%{customdata[2]}</b><br>" + ss.indicator +
+                              ": %{customdata[1]:,}<extra></extra>",
+                showlegend=False,
+            ))
+            if min_lon < max_lon and min_lat < max_lat:
+                pad = max(max_lon - min_lon, max_lat - min_lat) * 0.04
+                figure.update_xaxes(
+                    range=[min_lon - pad, max_lon + pad], visible=False, fixedrange=True, constrain="domain"
+                )
+                figure.update_yaxes(
+                    range=[min_lat - pad, max_lat + pad], visible=False, fixedrange=True,
+                    scaleanchor="x", scaleratio=1, constrain="domain"
+                )
+            figure.update_layout(
+                height=580,
+                margin=dict(l=0, r=0, t=4, b=4),
+                dragmode=False,
+                clickmode="event+select",
+                showlegend=False,
+                plot_bgcolor=MAP_BG,
+                paper_bgcolor=MAP_BG,
+                hoverlabel=dict(bgcolor="#FFFFFF", font_color=MAP_TEXT),
+            )
+            event = st.plotly_chart(
+                figure,
+                width="stretch",
+                on_select="rerun",
+                selection_mode="points",
+                key=f"lga_map_{selected_state}_{ss.map_version}",
+                config={"displayModeBar": False},
+            )
+            points = (event or {}).get("selection", {}).get("points", [])
+            if points:
+                custom = points[0].get("customdata")
+                map_key = custom[0] if custom else None
+                if map_key and "|" in map_key:
+                    clicked_lga = map_key.split("|", 1)[1]
+                    if clicked_lga in available_lgas and clicked_lga != ss.lga_choice:
+                        ss["_pending_lga"] = clicked_lga
+                        st.rerun()
+            if unmatched:
+                st.warning(f"{len(unmatched)} local government boundary could not be matched to the dataset.")
+            st.caption("Tap a local-government marker or choose one in the details panel.")
+        else:
+            st.warning("Local government boundaries could not be loaded. The local government list is still available.")
+
+with right:
+    scope = "Nigeria" if selected_state == "All states" else format_name(selected_state)
+    st.markdown(
+        f'<div class="rhead">Drill-down: <b>{scope}</b>'
+        '<span class="beta">interactive map</span></div>',
+        unsafe_allow_html=True,
+    )
+    if selected_state == "All states":
+        ranking = view[["state", metric_column]].sort_values(metric_column, ascending=False).copy()
+        ranking["state"] = ranking.state.map(format_name)
+        ranking = ranking.rename(columns={"state": "State", metric_column: ss.indicator})
+        st.markdown(f"#### Top states — {ss.indicator}")
+        st.dataframe(ranking.head(10), hide_index=True, width="stretch", height=360)
+    else:
+        state_metric_row = metrics.loc[metrics.state == selected_state].iloc[0]
+        st.metric("Polling units", f"{int(state_metric_row.polling_units):,}")
+        detail_cols = st.columns(2)
+        detail_cols[0].metric("Wards", f"{int(state_metric_row.wards):,}")
+        detail_cols[1].metric("Local governments", f"{int(state_metric_row.lgas):,}")
+        st.selectbox(
+            "Choose a local government",
+            ["All LGAs", *available_lgas],
+            key="lga_choice",
+            format_func=lambda name: (
+                "All local governments" if name == "All LGAs"
+                else f"{name.title()} · {int(lga_summary.loc[name, 'polling_units']):,} PUs"
+            ),
         )
-    scope = format_name(selected_state) if selected_state != "All states" else (
-        ss.zone if ss.zone != "All zones" else "Nigeria"
-    )
-    st.download_button(
-        "Download current data as CSV",
-        search_data.drop(columns=["lga_key", "ward_key"]).to_csv(index=False).encode(),
-        f"polling_units_{_key(scope).replace(' ', '_')}.csv",
-        "text/csv",
-        width="stretch",
-    )
+        if ss.lga_choice != "All LGAs":
+            selected_lga = lga_summary.loc[ss.lga_choice]
+            st.markdown(f"#### {ss.lga_choice.title()}")
+            st.metric(ss.indicator, format_value(selected_lga[metric_column], metric_column))
+            st.caption(
+                f"{int(selected_lga.polling_units):,} polling units across "
+                f"{int(selected_lga.wards):,} wards"
+            )
+            ward_table = (
+                state_data[state_data.lg == ss.lga_choice]
+                .groupby("ward").size().reset_index(name="Polling units")
+                .sort_values("Polling units", ascending=False)
+                .rename(columns={"ward": "Ward"})
+            )
+            with st.expander("Wards in this local government"):
+                st.dataframe(ward_table, hide_index=True, width="stretch", height=260)
+
+        table_columns = ["polling_units", "wards"]
+        table_labels = ["Polling units", "Wards"]
+        if metric_column not in table_columns:
+            table_columns.append(metric_column)
+            table_labels.append(ss.indicator)
+        lga_table = lga_summary.reset_index().rename(columns={"lg": "Local government"})
+        lga_table["Local government"] = lga_table["Local government"].str.title()
+        lga_table = lga_table[["Local government", *table_columns]].sort_values(
+            "polling_units", ascending=False
+        )
+        lga_table.columns = ["Local government", *table_labels]
+        with st.expander("All local government details"):
+            st.dataframe(lga_table, hide_index=True, width="stretch", height=320)
+
+    search_data = df if selected_state == "All states" else state_data
+    if selected_state == "All states" and ss.zone != "All zones":
+        search_data = search_data[search_data.zone == ss.zone]
+    if selected_state != "All states" and ss.lga_choice != "All LGAs":
+        search_data = search_data[search_data.lg == ss.lga_choice]
+    with st.expander("Find a polling unit or download data"):
+        term = st.text_input("Search by location or code", key="search")
+        if term:
+            matches = search_data[
+                search_data.location.str.contains(term.lower(), regex=False)
+                | search_data.code.str.contains(term.lower(), regex=False)
+            ]
+            st.caption(f"{len(matches):,} match(es); showing up to 100.")
+            st.dataframe(
+                matches[["code", "state", "lg", "ward", "location"]].head(100),
+                hide_index=True,
+                width="stretch",
+                height=260,
+            )
+        file_scope = format_name(selected_state) if selected_state != "All states" else (
+            ss.zone if ss.zone != "All zones" else "Nigeria"
+        )
+        st.download_button(
+            "Download current data as CSV",
+            search_data.drop(columns=["lga_key", "ward_key"]).to_csv(index=False).encode(),
+            f"polling_units_{_key(file_scope).replace(' ', '_')}.csv",
+            "text/csv",
+            width="stretch",
+        )
